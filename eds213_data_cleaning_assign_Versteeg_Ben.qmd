@@ -1,0 +1,186 @@
+---
+title: "Data Cleaning Assignment"
+author: "Ben Versteeg"
+date: "2024-04-17"
+format: html
+editor: visual
+---
+
+```{r}
+#| message: false  
+
+# Libraries
+library(tidyverse)
+
+# file names
+datadir_raw <- "data/raw/"
+
+datadir_processed <- "data/processed/"
+
+# read in snow cover data
+survey_data <- read_csv("data/processed/snow_cover.csv")
+```
+
+## Cleaning Water Cover
+
+```{r}
+# Look for any problematic values
+survey_data %>%
+  count(Water_cover) %>%
+  filter(is.na(as.numeric(Water_cover)))
+```
+
+Replace problematic values to NA since there is no mention of using this symbol in the metadata.
+
+```{r}
+water_survey_fixed <- survey_data %>%
+  mutate(Water_cover = ifelse(Water_cover==".", NA, Water_cover)) %>%
+  mutate(Water_cover = ifelse(Water_cover=="-", NA, Water_cover)) %>%
+  mutate(Water_cover = ifelse(Water_cover=="n/a", NA, Water_cover)) %>%
+  mutate(Water_cover = ifelse(Water_cover=="unk", NA, Water_cover)) %>%
+  mutate(Water_cover = ifelse(Water_cover=="<1", "0", Water_cover)) %>%
+  mutate(Water_cover = as.numeric(Water_cover))
+```
+
+Check to see that we only have NAs as non numeric values
+```{r}
+water_survey_fixed %>%
+  count(Water_cover) %>%
+  filter(is.na(as.numeric(Water_cover)))
+```
+Transform
+```{r}
+water_survey_fixed <- water_survey_fixed %>%
+  mutate(Water_cover = as.numeric(Water_cover))
+```
+
+
+Remove any values over 100%
+```{r}
+water_survey_fixed <- water_survey_fixed %>%
+  mutate(Water_cover = ifelse(Water_cover > 100, NA, Water_cover))
+```
+
+Check for negative values:
+
+```{r}
+ water_survey_fixed %>%
+  filter(Water_cover < 0)
+```
+
+Write the presence table to a csv file:
+```{r}
+write_csv(water_survey_fixed, file.path(datadir_processed, "snow_water_cover.csv"))
+```
+
+
+## Cleaning Land Cover
+
+```{r}
+# read in snow and water cover data
+survey_data2 <- read_csv("data/processed/snow_water_cover.csv")
+```
+
+
+```{r}
+# Look for any problematic values
+survey_data2 %>%
+  count(Land_cover) %>%
+  filter(is.na(as.numeric(Land_cover)))
+```
+
+Replace problematic values to NA since there is no mention of using this symbol in the metadata.
+```{r}
+land_survey_fixed <- survey_data2 %>%
+  mutate(Land_cover = ifelse(Land_cover==".", NA, Land_cover)) %>%
+  mutate(Land_cover = ifelse(Land_cover=="-", NA, Land_cover)) %>%
+  mutate(Land_cover = ifelse(Land_cover=="n/a", NA, Land_cover)) %>%
+  mutate(Land_cover = ifelse(Land_cover=="unk", NA, Land_cover)) %>%
+  mutate(Land_cover = ifelse(Land_cover=="<1", "0", Land_cover)) %>%
+  mutate(Land_cover = as.numeric(Land_cover))
+```
+
+Check to see that we only have NAs as non numeric values
+```{r}
+land_survey_fixed %>%
+  count(Land_cover) %>%
+  filter(is.na(as.numeric(Land_cover)))
+```
+Transform
+```{r}
+land_survey_fixed <- land_survey_fixed %>%
+  mutate(Land_cover = as.numeric(Land_cover))
+```
+
+Check for values over 100%
+```{r}
+ land_survey_fixed %>%
+  filter(Land_cover > 100)
+```
+
+Check for negative values
+```{r}
+ land_survey_fixed %>%
+  filter(Land_cover < 0)
+```
+
+Remove any negative values
+```{r}
+land_survey_fixed <- land_survey_fixed %>%
+  mutate(Land_cover = ifelse(Land_cover < 0, NA, Land_cover))
+```
+
+So i have 4 columns in a dataset called land_survey_fixed. Snow_cover, Water_cover, Land_cover, and Total_cover. Each of these values have a percent amount. The sum of Snow_cover, Water_cover, and Land_cover rows should add up to 100 and that's what goes into the Total_cover column. However, there are some NA values in each of the columns. In order to use the relationship between the three cover columns (Snow, Water, Land) to infer missing values where possible and recompute the Total_cover column, I'm thinking of using case_when functions in order to do this. If there is only 1 NA value between Snow, Water, or Land columns in a row then we can just assume the missing value so the Total_cover equals 100. However, if there are 2 or more NA values between Snow, Water, or Land columns, Then just drop that whole row.
+
+
+```{r}
+# Replace NA with 0 in the cover columns
+cleaned_data <- land_survey_fixed %>%
+  mutate(
+    Snow_cover = replace_na(Snow_cover, 0),
+    Water_cover = replace_na(Water_cover, 0),
+    Land_cover = replace_na(Land_cover, 0)
+  )
+
+# Filter out rows with 2 or more original NAs (now zeros) in the cover columns
+cleaned_data <- cleaned_data %>%
+  filter(rowSums(select(., Snow_cover, Water_cover, Land_cover) == 0) <= 2)
+
+# Recompute cover values to ensure they sum to 100
+cleaned_data <- cleaned_data %>%
+  mutate(
+    Snow_cover = case_when(
+      Snow_cover == 0 ~ 100 - Water_cover - Land_cover,
+      TRUE ~ Snow_cover
+    ),
+    Water_cover = case_when(
+      Water_cover == 0 ~ 100 - Snow_cover - Land_cover,
+      TRUE ~ Water_cover
+    ),
+    Land_cover = case_when(
+      Land_cover == 0 ~ 100 - Snow_cover - Water_cover,
+      TRUE ~ Land_cover
+    ),
+    Total_cover = Snow_cover + Water_cover + Land_cover
+  )
+
+# Drop rows where Total_cover does not equal 100
+cleaned_data <- cleaned_data %>%
+  filter(Total_cover == 100)
+
+# Drop rows where values became a negative value
+cleaned_data <- cleaned_data %>%
+  mutate(Snow_cover = ifelse(Snow_cover < 0, NA, Snow_cover)) %>% 
+  mutate(Land_cover = ifelse(Land_cover < 0, NA, Land_cover)) %>% 
+  mutate(Water_cover = ifelse(Water_cover < 0, NA, Water_cover))
+
+# Display the modified dataset
+print(cleaned_data)
+```
+
+
+
+Write the presence table to a csv file:
+```{r}
+write_csv(cleaned_data, file.path(datadir_processed, "all_cover_fixed_VersteegBen.csv"))
+```
