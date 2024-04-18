@@ -141,6 +141,10 @@ land_survey_fixed <- land_survey_fixed %>%
   mutate(Land_cover = ifelse(Land_cover < 0, NA, Land_cover))
 ```
 
+```{r}
+write_csv(land_survey_fixed, file.path(datadir_processed, "snow_water_land_cover.csv"))
+```
+
 ## Recomputing Total Cover Column
 
 So there are 4 columns (Snow_cover, Water_cover, Land_cover, and Total_cover). Each of these values have a percent amount. The sum of Snow_cover, Water_cover, and Land_cover rows should add up to 100 and that's what goes into the Total_cover column. However, there are some NA values in each of the columns. In order to use the relationship between the three cover columns (Snow, Water, Land) to infer missing values where possible and recompute the Total_cover column, I'm thinking of using case_when functions in order to do this. If there is only 1 NA value between Snow, Water, or Land columns in a row then we can just assume the missing value so the Total_cover equals 100. However, if there are 2 or more NA values between Snow, Water, or Land columns, Then just drop that whole row.
