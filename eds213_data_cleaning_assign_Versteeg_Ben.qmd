@@ -6,6 +6,8 @@ format: html
 editor: visual
 ---
 
+Link to repo: <https://github.com/BenVerst/bren-meds213-data-cleaning>
+
 ```{r}
 #| message: false  
 
@@ -43,19 +45,22 @@ water_survey_fixed <- survey_data %>%
 ```
 
 Check to see that we only have NAs as non numeric values
+
 ```{r}
 water_survey_fixed %>%
   count(Water_cover) %>%
   filter(is.na(as.numeric(Water_cover)))
 ```
+
 Transform
+
 ```{r}
 water_survey_fixed <- water_survey_fixed %>%
   mutate(Water_cover = as.numeric(Water_cover))
 ```
 
-
 Remove any values over 100%
+
 ```{r}
 water_survey_fixed <- water_survey_fixed %>%
   mutate(Water_cover = ifelse(Water_cover > 100, NA, Water_cover))
@@ -69,10 +74,10 @@ Check for negative values:
 ```
 
 Write the presence table to a csv file:
+
 ```{r}
 write_csv(water_survey_fixed, file.path(datadir_processed, "snow_water_cover.csv"))
 ```
-
 
 ## Cleaning Land Cover
 
@@ -80,7 +85,6 @@ write_csv(water_survey_fixed, file.path(datadir_processed, "snow_water_cover.csv
 # read in snow and water cover data
 survey_data2 <- read_csv("data/processed/snow_water_cover.csv")
 ```
-
 
 ```{r}
 # Look for any problematic values
@@ -90,6 +94,7 @@ survey_data2 %>%
 ```
 
 Replace problematic values to NA since there is no mention of using this symbol in the metadata.
+
 ```{r}
 land_survey_fixed <- survey_data2 %>%
   mutate(Land_cover = ifelse(Land_cover==".", NA, Land_cover)) %>%
@@ -101,37 +106,44 @@ land_survey_fixed <- survey_data2 %>%
 ```
 
 Check to see that we only have NAs as non numeric values
+
 ```{r}
 land_survey_fixed %>%
   count(Land_cover) %>%
   filter(is.na(as.numeric(Land_cover)))
 ```
+
 Transform
+
 ```{r}
 land_survey_fixed <- land_survey_fixed %>%
   mutate(Land_cover = as.numeric(Land_cover))
 ```
 
 Check for values over 100%
+
 ```{r}
  land_survey_fixed %>%
   filter(Land_cover > 100)
 ```
 
 Check for negative values
+
 ```{r}
  land_survey_fixed %>%
   filter(Land_cover < 0)
 ```
 
 Remove any negative values
+
 ```{r}
 land_survey_fixed <- land_survey_fixed %>%
   mutate(Land_cover = ifelse(Land_cover < 0, NA, Land_cover))
 ```
 
-So i have 4 columns in a dataset called land_survey_fixed. Snow_cover, Water_cover, Land_cover, and Total_cover. Each of these values have a percent amount. The sum of Snow_cover, Water_cover, and Land_cover rows should add up to 100 and that's what goes into the Total_cover column. However, there are some NA values in each of the columns. In order to use the relationship between the three cover columns (Snow, Water, Land) to infer missing values where possible and recompute the Total_cover column, I'm thinking of using case_when functions in order to do this. If there is only 1 NA value between Snow, Water, or Land columns in a row then we can just assume the missing value so the Total_cover equals 100. However, if there are 2 or more NA values between Snow, Water, or Land columns, Then just drop that whole row.
+## Recomputing Total Cover Column
 
+So there are 4 columns (Snow_cover, Water_cover, Land_cover, and Total_cover). Each of these values have a percent amount. The sum of Snow_cover, Water_cover, and Land_cover rows should add up to 100 and that's what goes into the Total_cover column. However, there are some NA values in each of the columns. In order to use the relationship between the three cover columns (Snow, Water, Land) to infer missing values where possible and recompute the Total_cover column, I'm thinking of using case_when functions in order to do this. If there is only 1 NA value between Snow, Water, or Land columns in a row then we can just assume the missing value so the Total_cover equals 100. However, if there are 2 or more NA values between Snow, Water, or Land columns, Then just drop that whole row.
 
 ```{r}
 # Replace NA with 0 in the cover columns
@@ -178,9 +190,8 @@ cleaned_data <- cleaned_data %>%
 print(cleaned_data)
 ```
 
-
-
 Write the presence table to a csv file:
+
 ```{r}
 write_csv(cleaned_data, file.path(datadir_processed, "all_cover_fixed_VersteegBen.csv"))
 ```
